@@ -574,12 +574,30 @@ export function PipesSection() {
 
   const togglePipe = async (name: string, enabled: boolean) => {
     posthog.capture("pipe_toggled", { pipe: name, enabled });
-    await fetch(`http://localhost:3030/pipes/${name}/enable`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ enabled }),
-    });
-    fetchPipes();
+    // Optimistic update — flip the switch immediately
+    setPipes((prev) =>
+      prev.map((p) =>
+        p.config.name === name
+          ? { ...p, config: { ...p.config, enabled } }
+          : p
+      )
+    );
+    try {
+      await fetch(`http://localhost:3030/pipes/${name}/enable`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled }),
+      });
+    } catch {
+      // Revert on failure
+      setPipes((prev) =>
+        prev.map((p) =>
+          p.config.name === name
+            ? { ...p, config: { ...p.config, enabled: !enabled } }
+            : p
+        )
+      );
+    }
   };
 
   const runPipe = async (name: string) => {
