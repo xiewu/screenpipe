@@ -265,7 +265,29 @@ pub unsafe fn make_nswindow_webview_first_responder(ns_win: tauri_nspanel::cocoa
     }
 
     if wk_view != nil {
+        // Set first responder immediately (handles the common case)
         let _: () = msg_send![ns_win, makeFirstResponder: wk_view];
+
+        // Also schedule on the next run-loop tick to win the race against any
+        // deferred responder-chain reset triggered by makeKeyAndOrderFront.
+        // Same pattern as make_webview_first_responder for NSPanel.
+        let win_id = ns_win as usize;
+        let wk_id = wk_view as usize;
+        extern "C" {
+            static _dispatch_main_q: std::ffi::c_void;
+            fn dispatch_async_f(queue: *const std::ffi::c_void, context: *mut std::ffi::c_void, work: extern "C" fn(*mut std::ffi::c_void));
+        }
+        struct Ctx { win_id: usize, wk_id: usize }
+        extern "C" fn set_responder(ctx: *mut std::ffi::c_void) {
+            unsafe {
+                let ctx = Box::from_raw(ctx as *mut Ctx);
+                let window: id = ctx.win_id as id;
+                let wk: id = ctx.wk_id as id;
+                let _: () = msg_send![window, makeFirstResponder: wk];
+            }
+        }
+        let ctx = Box::into_raw(Box::new(Ctx { win_id, wk_id }));
+        dispatch_async_f(&_dispatch_main_q, ctx as *mut std::ffi::c_void, set_responder);
     }
 }
 

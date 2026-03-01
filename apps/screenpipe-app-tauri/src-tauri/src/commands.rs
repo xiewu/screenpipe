@@ -500,9 +500,11 @@ pub async fn show_window(
     Ok(())
 }
 
-/// Re-assert the WKWebView as first responder for the current key panel.
-/// Called from JS on pointer enter / window focus to ensure trackpad pinch
-/// gestures (magnifyWithEvent:) reach the WKWebView for zoom handling.
+/// Re-assert the WKWebView as first responder for the current key window/panel.
+/// Called from JS on window focus, pointer enter, and periodically by a focus
+/// watchdog to recover from silent WKWebView focus loss (tao#208, tauri#11897).
+/// Handles both NSPanel-based windows (main overlay, chat) and regular NSWindows
+/// (settings) so keyboard input works reliably across all window types.
 #[tauri::command]
 #[specta::specta]
 pub async fn ensure_webview_focus(app_handle: tauri::AppHandle) -> Result<(), String> {
@@ -513,9 +515,23 @@ pub async fn ensure_webview_focus(app_handle: tauri::AppHandle) -> Result<(), St
 
         let app = app_handle.clone();
         run_on_main_thread_safe(&app_handle, move || {
-            for label in &["main", "main-window"] {
+            // Try NSPanel-based windows first (main overlay, chat)
+            for label in &["main", "main-window", "chat"] {
                 if let Ok(panel) = app.get_webview_panel(label) {
                     unsafe { crate::window_api::make_webview_first_responder(&panel); }
+                    return;
+                }
+            }
+            // Fall back to regular NSWindow (settings, etc.)
+            for label in &["settings"] {
+                if let Some(window) = app.get_webview_window(label) {
+                    if let Ok(ns_win) = window.ns_window() {
+                        unsafe {
+                            crate::window_api::make_nswindow_webview_first_responder(
+                                ns_win as tauri_nspanel::cocoa::base::id,
+                            );
+                        }
+                    }
                     return;
                 }
             }
