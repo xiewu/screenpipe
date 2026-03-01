@@ -280,11 +280,21 @@ jobs:
           Get-ChildItem "$extractDir/lib" | ForEach-Object { Write-Host $_.Name }
 
       - name: Install Vulkan SDK
-        uses: jakoch/install-vulkan-sdk-action@v1.0.5
-        with:
-          vulkan_version: latest
-          install_runtime: false
-          cache: true
+        shell: powershell
+        run: |
+          $installer = "$env:TEMP\VulkanSDK.exe"
+          Write-Host "Downloading Vulkan SDK..."
+          Invoke-WebRequest -Uri "https://sdk.lunarg.com/sdk/download/latest/windows/vulkan-sdk.exe" -OutFile $installer
+          Write-Host "Installing Vulkan SDK silently..."
+          Start-Process -FilePath $installer -Args "--accept-licenses --default-answer --confirm-command install" -Wait
+          Remove-Item $installer -Force
+          $sdkDir = Get-ChildItem "C:\VulkanSDK" -Directory | Sort-Object Name -Descending | Select-Object -First 1
+          if ($sdkDir) {
+            Write-Host "Vulkan SDK installed at $($sdkDir.FullName)"
+            echo "VULKAN_SDK=$($sdkDir.FullName)" >> $env:GITHUB_ENV
+          } else {
+            throw "Vulkan SDK installation failed"
+          }
 
       - name: Shorten target dir to avoid MAX_PATH (Vulkan shaders)
         shell: powershell
