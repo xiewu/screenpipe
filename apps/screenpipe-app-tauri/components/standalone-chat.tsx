@@ -1700,6 +1700,36 @@ export function StandaloneChat({ className }: { className?: string } = {}) {
               );
             }
           }
+        } else if ((data.type === "message_start" || data.type === "message_end") &&
+                   data.message?.role === "assistant" && data.message?.stopReason === "error") {
+          // LLM returned an error (credits_exhausted, rate limit, provider error, etc.)
+          const errMsg = data.message.errorMessage || data.message.error || "Unknown error";
+          console.error("[Pi] LLM error via", data.type, ":", errMsg);
+
+          if (piMessageIdRef.current) {
+            const msgId = piMessageIdRef.current;
+
+            if (errMsg.includes("credits_exhausted") || errMsg.includes("daily_limit_exceeded") || errMsg.includes("429")) {
+              try {
+                const resetsAtMatch = errMsg.match(/"resets_at":\s*"([^"]+)"/);
+                if (resetsAtMatch) setUpgradeResetsAt(resetsAtMatch[1]);
+              } catch {}
+              setUpgradeReason("daily_limit");
+              posthog.capture("wall_hit", { reason: "daily_limit", source: "chat" });
+              setMessages((prev) =>
+                prev.map((m) => m.id === msgId ? { ...m, content: "You've used all your free queries for today." } : m)
+              );
+            } else if (errMsg.includes("rate limit") || errMsg.includes("rate_limit")) {
+              setUpgradeReason("rate_limit");
+              setMessages((prev) =>
+                prev.map((m) => m.id === msgId ? { ...m, content: "Rate limited — try again in a moment." } : m)
+              );
+            } else {
+              setMessages((prev) =>
+                prev.map((m) => m.id === msgId ? { ...m, content: `Error: ${errMsg}` } : m)
+              );
+            }
+          }
         } else if (data.type === "agent_end") {
           // When watching a pipe, agent_end fires before pipe_done — don't
           // clear pipe refs here, let pipe_done handle cleanup instead.
@@ -1708,15 +1738,45 @@ export function StandaloneChat({ className }: { className?: string } = {}) {
             const msgId = piMessageIdRef.current;
             // Use streamed text if available, otherwise extract from agent_end messages
             let content = piStreamingTextRef.current;
-            if (!content && data.messages && Array.isArray(data.messages)) {
-              // Extract text from all assistant messages in the agent_end payload
-              content = data.messages
-                .filter((m: any) => m.role === "assistant")
-                .flatMap((m: any) => (m.content || [])
-                  .filter((c: any) => c.type === "text")
-                  .map((c: any) => c.text))
-                .join("\n\n");
+
+            // Check for LLM errors in agent_end messages (e.g. credits_exhausted mid-conversation)
+            let agentEndError: string | null = null;
+            if (data.messages && Array.isArray(data.messages)) {
+              for (const m of data.messages) {
+                if (m.role === "assistant" && m.stopReason === "error") {
+                  agentEndError = m.errorMessage || m.error || null;
+                  break;
+                }
+              }
+              if (!content) {
+                // Extract text from all assistant messages in the agent_end payload
+                content = data.messages
+                  .filter((m: any) => m.role === "assistant")
+                  .flatMap((m: any) => (m.content || [])
+                    .filter((c: any) => c.type === "text")
+                    .map((c: any) => c.text))
+                  .join("\n\n");
+              }
             }
+
+            // Surface credits_exhausted / rate limit errors from agent_end
+            if (agentEndError && !content) {
+              const errStr = agentEndError;
+              if (errStr.includes("credits_exhausted") || errStr.includes("daily_limit_exceeded") || errStr.includes("429")) {
+                try {
+                  const resetsAtMatch = errStr.match(/"resets_at":\s*"([^"]+)"/);
+                  if (resetsAtMatch) setUpgradeResetsAt(resetsAtMatch[1]);
+                } catch {}
+                setUpgradeReason("daily_limit");
+                content = "You've used all your free queries for today.";
+              } else if (errStr.includes("rate limit")) {
+                setUpgradeReason("rate_limit");
+                content = "Rate limited — try again in a moment.";
+              } else {
+                content = `Error: ${errStr}`;
+              }
+            }
+
             // Snapshot refs BEFORE setMessages — React's batching may defer the
             // functional updater until after the refs are cleared below.
             const blocksSnapshot = [...piContentBlocksRef.current];
