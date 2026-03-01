@@ -2032,13 +2032,6 @@ impl DatabaseManager {
             timestamp_b.cmp(&timestamp_a)
         });
 
-        // Apply offset and limit after sorting
-        results = results
-            .into_iter()
-            .skip(offset as usize)
-            .take(limit as usize)
-            .collect();
-
         Ok(results)
     }
 
