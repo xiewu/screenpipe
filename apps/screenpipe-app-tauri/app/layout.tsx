@@ -95,12 +95,11 @@ export default function RootLayout({
     const focusWatchdog = setInterval(() => {
       // Only check when the window is visible and focused
       if (document.hidden || !document.hasFocus()) return;
-      // If we haven't seen a keystroke in 10s and the active element is body
-      // (not an input), something may be wrong — but don't interfere if user
-      // is just using the mouse. Only recover if user recently clicked (mouse
-      // activity without keyboard suggests potential stuck state).
+      // If we haven't seen a keystroke in 2s and the active element is body
+      // (not an input), the WKWebView may have lost first-responder status.
+      // Recover quickly — 10s was too long and left typing broken after tray open.
       const now = Date.now();
-      const noRecentKeys = now - lastKeyTime > 10_000;
+      const noRecentKeys = now - lastKeyTime > 2_000;
       const activeIsBody = document.activeElement === document.body || !document.activeElement;
       if (noRecentKeys && activeIsBody) {
         callNativeFocusRecovery();

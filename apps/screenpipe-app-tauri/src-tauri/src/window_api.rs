@@ -716,6 +716,7 @@ impl ShowRewindWindow {
                 run_on_main_thread_safe(app, move || {
                     if let Ok(panel) = app_clone.get_webview_panel(&lbl) {
                         use tauri_nspanel::cocoa::appkit::NSWindowCollectionBehavior;
+                        use tauri_nspanel::cocoa::base::id;
                         use objc::{msg_send, sel, sel_impl};
                         panel.set_level(1001);
                         panel.set_collection_behaviour(
@@ -728,6 +729,12 @@ impl ShowRewindWindow {
                         save_frontmost_app();
                         unsafe {
                             let _: () = msg_send![&*panel, setAlphaValue: 1.0f64];
+                            // Activate the app so keyboard events route to the WKWebView.
+                            // NSNonactivatingPanelMask prevents the app from becoming
+                            // frontmost on its own, so without this the webview never
+                            // receives keyboard input when opened from the tray menu.
+                            let ns_app: id = msg_send![objc::class!(NSApplication), sharedApplication];
+                            let _: () = msg_send![ns_app, activateIgnoringOtherApps: true];
                         }
                         panel.order_front_regardless();
                         panel.make_key_window();
@@ -1076,6 +1083,7 @@ impl ShowRewindWindow {
                             let app_for_emit = window_clone.app_handle().clone();
                             run_on_main_thread_safe(app, move || {
                                 use tauri_nspanel::cocoa::appkit::NSWindowCollectionBehavior;
+                                use tauri_nspanel::cocoa::base::id;
                                 use objc::{msg_send, sel, sel_impl};
 
                                 if let Ok(panel) = window_clone.to_panel() {
@@ -1100,6 +1108,11 @@ impl ShowRewindWindow {
                                         NSWindowCollectionBehavior::NSWindowCollectionBehaviorMoveToActiveSpace |
                                         NSWindowCollectionBehavior::NSWindowCollectionBehaviorFullScreenAuxiliary
                                     );
+                                    // Activate the app so keyboard events route to the WKWebView.
+                                    unsafe {
+                                        let ns_app: id = msg_send![objc::class!(NSApplication), sharedApplication];
+                                        let _: () = msg_send![ns_app, activateIgnoringOtherApps: true];
+                                    }
                                     panel.order_front_regardless();
                                     panel.make_key_window();
                                     // Set WKWebView as first responder AFTER make_key_window
@@ -1165,9 +1178,16 @@ impl ShowRewindWindow {
                                     #[cfg(target_os = "macos")]
                                     {
                                         use objc::{msg_send, sel, sel_impl};
+                                        use tauri_nspanel::cocoa::base::id;
                                         if let Ok(panel) = app_clone.get_webview_panel("main-window") {
                                             unsafe {
                                                 let _: () = msg_send![&*panel, setAlphaValue: 1.0f64];
+                                                // Activate the app so keyboard events
+                                                // route to the WKWebView (same reason as
+                                                // show_existing_main — NonActivatingPanel
+                                                // won't activate the app on its own).
+                                                let ns_app: id = msg_send![objc::class!(NSApplication), sharedApplication];
+                                                let _: () = msg_send![ns_app, activateIgnoringOtherApps: true];
                                             }
                                             // Ensure panel is key window before setting first
                                             // responder, otherwise magnifyWithEvent: won't
