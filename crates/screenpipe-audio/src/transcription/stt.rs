@@ -138,6 +138,8 @@ pub async fn stt(
                 model: "whisper-1".to_string(),
             });
 
+            // Collect vocabulary words for the prompt/context field
+            let vocab_words: Vec<String> = vocabulary.iter().map(|v| v.word.clone()).collect();
             match transcribe_with_openai_compatible(
                 &config.endpoint,
                 config.api_key.as_deref(),
@@ -146,6 +148,7 @@ pub async fn stt(
                 device,
                 sample_rate,
                 languages.clone(),
+                &vocab_words,
             )
             .await
             {

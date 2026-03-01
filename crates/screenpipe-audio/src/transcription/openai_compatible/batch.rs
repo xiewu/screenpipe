@@ -12,10 +12,10 @@ use std::time::Duration;
 use tracing::{debug, error, info};
 
 /// Transcribe audio using an OpenAI-compatible API endpoint.
-/// 
+///
 /// This function sends audio data to any server that implements the OpenAI
-/// audio transcriptions API format (e.g., llama.cpp, ollama, vLLM, etc.)
-/// 
+/// audio transcriptions API format (e.g., mlx-audio, llama.cpp, vLLM, etc.)
+///
 /// # Arguments
 /// * `endpoint` - Base URL of the API (e.g., "http://127.0.0.1:8080")
 /// * `api_key` - Optional API key for authentication
@@ -24,6 +24,8 @@ use tracing::{debug, error, info};
 /// * `device` - Device name for logging
 /// * `sample_rate` - Audio sample rate
 /// * `languages` - Language hints (passed to API if supported)
+/// * `vocabulary` - Optional vocabulary/hotwords passed as `prompt` field
+///   (used by VibeVoice-ASR `--context`, Whisper `--initial-prompt`, etc.)
 pub async fn transcribe_with_openai_compatible(
     endpoint: &str,
     api_key: Option<&str>,
@@ -32,6 +34,7 @@ pub async fn transcribe_with_openai_compatible(
     device: &str,
     sample_rate: u32,
     languages: Vec<Language>,
+    vocabulary: &[String],
 ) -> Result<String> {
     debug!(
         "starting openai compatible transcription to {} with model {}",
@@ -62,6 +65,15 @@ pub async fn transcribe_with_openai_compatible(
         // Use the first language as the primary language hint
         let lang_code = languages[0].as_lang_code();
         form = form.text("language", lang_code.to_string());
+    }
+
+    // Pass vocabulary/hotwords as the `prompt` field.
+    // OpenAI Whisper API uses this as initial prompt for biasing.
+    // VibeVoice-ASR (via mlx-audio) maps this to `--context` for hotwords.
+    if !vocabulary.is_empty() {
+        let prompt = vocabulary.join(", ");
+        debug!("passing vocabulary as prompt: {}", prompt);
+        form = form.text("prompt", prompt);
     }
 
     // Build request with optional authentication
