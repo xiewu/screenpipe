@@ -357,7 +357,7 @@ fn force_disabled(raw_content: &str) -> String {
 fn parse_rfc3339(s: &str) -> DateTime<Utc> {
     DateTime::parse_from_rfc3339(s)
         .map(|dt| dt.with_timezone(&Utc))
-        .unwrap_or_else(|_| DateTime::UNIX_EPOCH.into())
+        .unwrap_or_else(|_| DateTime::UNIX_EPOCH)
 }
 
 /// Parse an RFC 3339 timestamp, returning None on failure.

@@ -256,7 +256,7 @@ impl TranscriptionSession {
                     || text.eq_ignore_ascii_case("language none")
                     || text
                         .strip_prefix("language ")
-                        .map_or(false, |rest| rest.chars().all(|c| c.is_alphabetic()))
+                        .is_some_and(|rest| rest.chars().all(|c| c.is_alphabetic()))
                 {
                     Ok(String::new())
                 } else {

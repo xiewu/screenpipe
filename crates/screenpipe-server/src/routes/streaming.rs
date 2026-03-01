@@ -326,10 +326,10 @@ async fn handle_stream_frames_socket(
                                             }
                                             sent.insert(chunk.frame_id);
                                             let frame = create_time_series_frame(chunk);
-                                            if !frame.frame_data.is_empty() {
-                                                if frame_tx_db.send(frame).await.is_err() {
-                                                    break;
-                                                }
+                                            if !frame.frame_data.is_empty()
+                                                && frame_tx_db.send(frame).await.is_err()
+                                            {
+                                                break;
                                             }
                                         }
                                         info!("Today DB backfill complete");

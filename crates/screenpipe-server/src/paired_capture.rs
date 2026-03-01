@@ -97,7 +97,7 @@ pub async fn paired_capture(
     // which returns non-empty but low-quality text (raw buffer content
     // without visual formatting). For these apps we always run OCR to get
     // proper bounding-box text positions for the selectable overlay.
-    let app_prefers_ocr = ctx.app_name.map_or(false, |name| {
+    let app_prefers_ocr = ctx.app_name.is_some_and(|name| {
         let n = name.to_lowercase();
         // Terminal emulators whose AX text is raw buffer and not useful
         // for bounding-box overlay. OCR produces better results.
@@ -207,7 +207,7 @@ pub async fn paired_capture(
     // This sanitizes emails, API keys, credit cards, SSNs, etc. from OCR/accessibility text
     // so pipes (like obsidian-sync) never see raw PII in search results.
     let sanitized_text = if ctx.use_pii_removal {
-        final_text.map(|t| remove_pii(t))
+        final_text.map(remove_pii)
     } else {
         final_text.map(|t| t.to_string())
     };

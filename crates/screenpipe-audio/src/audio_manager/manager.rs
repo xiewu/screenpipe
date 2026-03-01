@@ -176,10 +176,10 @@ impl AudioManager {
                         let langs = opts.languages.clone();
                         let vocab = opts.vocabulary.clone();
                         drop(opts);
-                        
+
                         // Get whisper context from transcription engine
                         let whisper_ctx = transcription_engine.whisper_context();
-                        
+
                         let count = super::reconciliation::reconcile_untranscribed(
                             &db,
                             transcription_engine,

@@ -13,8 +13,10 @@ use crate::{
         device::{default_input_device, default_output_device},
         engine::AudioTranscriptionEngine,
     },
-    transcription::{deepgram::CUSTOM_DEEPGRAM_API_TOKEN, stt::OpenAICompatibleConfig, VocabularyEntry},
     meeting_detector::MeetingDetector,
+    transcription::{
+        deepgram::CUSTOM_DEEPGRAM_API_TOKEN, stt::OpenAICompatibleConfig, VocabularyEntry,
+    },
     vad::VadEngineEnum,
 };
 

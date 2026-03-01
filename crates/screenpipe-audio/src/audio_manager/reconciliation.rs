@@ -8,13 +8,13 @@ use std::sync::Arc;
 use screenpipe_db::{DatabaseManager, UntranscribedChunk};
 use tracing::{debug, error, warn};
 
+use crate::core::engine::AudioTranscriptionEngine;
 use crate::transcription::engine::{TranscriptionEngine, TranscriptionSession};
 use crate::transcription::{AudioInsertCallback, AudioInsertInfo};
-use crate::core::engine::AudioTranscriptionEngine;
 
-use crate::OpenAICompatibleConfig;
 use crate::transcription::VocabularyEntry;
 use crate::utils::ffmpeg::read_audio_from_file;
+use crate::OpenAICompatibleConfig;
 use screenpipe_core::Language;
 use whisper_rs::WhisperContext;
 
@@ -145,7 +145,10 @@ pub async fn reconcile_untranscribed(
         };
 
         // Transcribe the concatenated audio in one shot using session
-        let full_text = match session.transcribe(&combined_samples, sample_rate, &device_name).await {
+        let full_text = match session
+            .transcribe(&combined_samples, sample_rate, &device_name)
+            .await
+        {
             Ok(t) => t,
             Err(e) => {
                 error!("reconciliation: transcription failed for batch: {}", e);

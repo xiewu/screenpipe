@@ -370,6 +370,27 @@ pub fn do_permissions_check(initial_check: bool) -> OSPermissionsCheck {
     }
 }
 
+/// Launch Arc if it's not already running, then wait briefly for it to start.
+/// The macOS Automation permission prompt requires the target app to be running.
+#[cfg(target_os = "macos")]
+fn ensure_arc_running() {
+    use std::process::Command;
+
+    // Check if Arc is already running via pgrep
+    let running = Command::new("pgrep")
+        .args(["-x", "Arc"])
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+
+    if !running {
+        debug!("arc not running, launching it for automation permission prompt");
+        let _ = Command::new("open").args(["-a", "Arc"]).spawn();
+        // Give Arc a moment to launch before the permission API call
+        std::thread::sleep(std::time::Duration::from_secs(2));
+    }
+}
+
 /// Check if Arc browser is installed (macOS only)
 #[tauri::command(async)]
 #[specta::specta]
@@ -565,6 +586,9 @@ fn run_self_detached_fire_and_forget(flag: &str) {
 pub fn request_arc_automation_permission(_app: tauri::AppHandle) -> bool {
     #[cfg(target_os = "macos")]
     {
+        // Arc must be running for macOS to show the permission prompt
+        ensure_arc_running();
+
         if is_app_bundle() {
             let result = ae_check_automation_direct("company.thebrowser.Browser", true);
             if result != 0 {

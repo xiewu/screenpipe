@@ -263,7 +263,7 @@ impl MacosTreeWalker {
         // Ref: https://github.com/electron/electron/issues/7206
         let eui_attr_name = cf::String::from_str("AXEnhancedUserInterface");
         let eui_attr = ax::Attr::with_string(&eui_attr_name);
-        let _ = ax_app.set_attr(&eui_attr, cf::Boolean::value_true());
+        let _ = ax_app.set_attr(eui_attr, cf::Boolean::value_true());
 
         let window_val = match ax_app.attr_value(ax::attr::focused_window()) {
             Ok(v) => v,

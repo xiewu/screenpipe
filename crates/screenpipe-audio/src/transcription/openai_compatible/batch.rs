@@ -4,7 +4,7 @@
 
 use anyhow::Result;
 use hound::{WavSpec, WavWriter};
-use reqwest::{Client, Response, multipart};
+use reqwest::{multipart, Client, Response};
 use screenpipe_core::Language;
 use serde_json::Value;
 use std::io::Cursor;
@@ -45,10 +45,8 @@ pub async fn transcribe_with_openai_compatible(
     let wav_data = create_wav_file(audio_data, sample_rate)?;
 
     // Build the request (with timeout to prevent hanging on unresponsive endpoints)
-    let client = Client::builder()
-        .timeout(Duration::from_secs(30))
-        .build()?;
-    
+    let client = Client::builder().timeout(Duration::from_secs(30)).build()?;
+
     // Build multipart form
     let mut form = multipart::Form::new()
         .text("model", model.to_string())
@@ -59,7 +57,7 @@ pub async fn transcribe_with_openai_compatible(
                 .file_name("audio.wav")
                 .mime_str("audio/wav")?,
         );
-    
+
     // Add language if specified
     if !languages.is_empty() {
         // Use the first language as the primary language hint
@@ -103,7 +101,7 @@ fn create_wav_file(audio_data: &[f32], sample_rate: u32) -> Result<Vec<u8>> {
         } else {
             sample_rate
         };
-        
+
         let spec = WavSpec {
             channels: 1,
             sample_rate: target_sample_rate,
@@ -111,7 +109,7 @@ fn create_wav_file(audio_data: &[f32], sample_rate: u32) -> Result<Vec<u8>> {
             sample_format: hound::SampleFormat::Float,
         };
         let mut writer = WavWriter::new(&mut cursor, spec)?;
-        
+
         // Simple decimation for downsampling if needed
         if target_sample_rate < sample_rate && sample_rate > 0 {
             let ratio = sample_rate / target_sample_rate;
@@ -133,19 +131,23 @@ fn create_wav_file(audio_data: &[f32], sample_rate: u32) -> Result<Vec<u8>> {
 
 async fn handle_response(response: Response, device: &str) -> Result<String> {
     let status = response.status();
-    
+
     if !status.is_success() {
-        let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+        let error_text = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Unknown error".to_string());
         error!(
             "OpenAI compatible API error (status {}): {}",
             status, error_text
         );
         return Err(anyhow::anyhow!(
             "API error (status {}): {}",
-            status, error_text
+            status,
+            error_text
         ));
     }
-    
+
     match response.json::<Value>().await {
         Ok(result) => {
             // Check for error in response body
@@ -186,10 +188,10 @@ mod tests {
         let audio_data: Vec<f32> = vec![0.0, 0.5, 0.0, -0.5, 0.0];
         let result = create_wav_file(&audio_data, 16000);
         assert!(result.is_ok());
-        
+
         let wav_data = result.unwrap();
         assert!(!wav_data.is_empty());
-        
+
         // Verify it's a valid WAV by reading it back
         let cursor = Cursor::new(wav_data);
         let reader = hound::WavReader::new(cursor).unwrap();
@@ -203,7 +205,7 @@ mod tests {
         let audio_data: Vec<f32> = (0..44100).map(|i| (i as f32 / 44100.0).sin()).collect();
         let result = create_wav_file(&audio_data, 44100);
         assert!(result.is_ok());
-        
+
         let wav_data = result.unwrap();
         let cursor = Cursor::new(wav_data);
         let reader = hound::WavReader::new(cursor).unwrap();

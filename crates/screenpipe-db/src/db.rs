@@ -1461,10 +1461,7 @@ impl DatabaseManager {
             match result {
                 Ok(id) => {
                     // Trim stack to current depth, then push
-                    while depth_stack
-                        .last()
-                        .map_or(false, |(d, _)| *d as i32 >= depth)
-                    {
+                    while depth_stack.last().is_some_and(|(d, _)| *d as i32 >= depth) {
                         depth_stack.pop();
                     }
                     depth_stack.push((node.depth, id));

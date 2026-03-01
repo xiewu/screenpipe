@@ -61,6 +61,12 @@ pub struct HotFrameCache {
     cache_day: RwLock<u32>,
 }
 
+impl Default for HotFrameCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl HotFrameCache {
     /// Create a new empty cache with broadcast channels (capacity 256).
     pub fn new() -> Self {

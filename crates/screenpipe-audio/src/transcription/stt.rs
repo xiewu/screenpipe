@@ -102,70 +102,80 @@ pub async fn stt(
     vocabulary: &[VocabularyEntry],
     alternate_stt: Option<AlternateSttEngine>,
 ) -> Result<String> {
-    let transcription: Result<String> =
-        if *audio_transcription_engine == AudioTranscriptionEngine::Disabled {
-            Ok(String::new())
-        } else if audio_transcription_engine == AudioTranscriptionEngine::Deepgram.into() {
-            // Deepgram implementation
-            let api_key = deepgram_api_key.unwrap_or_default();
+    let transcription: Result<String> = if *audio_transcription_engine
+        == AudioTranscriptionEngine::Disabled
+    {
+        Ok(String::new())
+    } else if audio_transcription_engine == AudioTranscriptionEngine::Deepgram.into() {
+        // Deepgram implementation
+        let api_key = deepgram_api_key.unwrap_or_default();
 
-            match transcribe_with_deepgram(&api_key, audio, device, sample_rate, languages.clone(), vocabulary)
-                .await
-            {
-                Ok(transcription) => Ok(transcription),
-                Err(e) => {
-                    error!(
-                        "device: {}, deepgram transcription failed, falling back to Whisper: {:?}",
-                        device, e
-                    );
-                    // Fallback to Whisper
-                    process_with_whisper(audio, languages.clone(), whisper_state, vocabulary).await
-                }
+        match transcribe_with_deepgram(
+            &api_key,
+            audio,
+            device,
+            sample_rate,
+            languages.clone(),
+            vocabulary,
+        )
+        .await
+        {
+            Ok(transcription) => Ok(transcription),
+            Err(e) => {
+                error!(
+                    "device: {}, deepgram transcription failed, falling back to Whisper: {:?}",
+                    device, e
+                );
+                // Fallback to Whisper
+                process_with_whisper(audio, languages.clone(), whisper_state, vocabulary).await
             }
-        } else if *audio_transcription_engine == AudioTranscriptionEngine::Qwen3Asr {
-            // Qwen3-ASR via alternate STT engine (audiopipe)
-            if let Some(ref engine) = alternate_stt {
-                let mut engine = engine.lock().map_err(|e| anyhow::anyhow!("stt model lock: {}", e))?;
-                engine.transcribe(audio, sample_rate)
-            } else {
-                Err(anyhow::anyhow!("qwen3-asr model not initialized"))
-            }
-        } else if audio_transcription_engine == AudioTranscriptionEngine::OpenAICompatible.into() {
-            // OpenAI Compatible implementation
-            let config = openai_compatible_config.unwrap_or_else(|| OpenAICompatibleConfig {
-                endpoint: "http://127.0.0.1:8080".to_string(),
-                api_key: None,
-                model: "whisper-1".to_string(),
-            });
+        }
+    } else if *audio_transcription_engine == AudioTranscriptionEngine::Qwen3Asr {
+        // Qwen3-ASR via alternate STT engine (audiopipe)
+        if let Some(ref engine) = alternate_stt {
+            let mut engine = engine
+                .lock()
+                .map_err(|e| anyhow::anyhow!("stt model lock: {}", e))?;
+            engine.transcribe(audio, sample_rate)
+        } else {
+            Err(anyhow::anyhow!("qwen3-asr model not initialized"))
+        }
+    } else if audio_transcription_engine == AudioTranscriptionEngine::OpenAICompatible.into() {
+        // OpenAI Compatible implementation
+        let config = openai_compatible_config.unwrap_or_else(|| OpenAICompatibleConfig {
+            endpoint: "http://127.0.0.1:8080".to_string(),
+            api_key: None,
+            model: "whisper-1".to_string(),
+        });
 
-            // Collect vocabulary words for the prompt/context field
-            let vocab_words: Vec<String> = vocabulary.iter().map(|v| v.word.clone()).collect();
-            match transcribe_with_openai_compatible(
-                &config.endpoint,
-                config.api_key.as_deref(),
-                &config.model,
-                audio,
-                device,
-                sample_rate,
-                languages.clone(),
-                &vocab_words,
-            )
-            .await
-            {
-                Ok(transcription) => Ok(transcription),
-                Err(e) => {
-                    error!(
+        // Collect vocabulary words for the prompt/context field
+        let vocab_words: Vec<String> = vocabulary.iter().map(|v| v.word.clone()).collect();
+        match transcribe_with_openai_compatible(
+            &config.endpoint,
+            config.api_key.as_deref(),
+            &config.model,
+            audio,
+            device,
+            sample_rate,
+            languages.clone(),
+            &vocab_words,
+        )
+        .await
+        {
+            Ok(transcription) => Ok(transcription),
+            Err(e) => {
+                error!(
                         "device: {}, openai compatible transcription failed, falling back to Whisper: {:?}",
                         device, e
                     );
-                    // Fallback to Whisper
-                    process_with_whisper(audio, languages.clone(), whisper_state, vocabulary).await
-                }
+                // Fallback to Whisper
+                process_with_whisper(audio, languages.clone(), whisper_state, vocabulary).await
             }
-        } else {
-            // Existing Whisper implementation
-            process_with_whisper(audio, languages, whisper_state, vocabulary).await
-        };
+        }
+    } else {
+        // Existing Whisper implementation
+        process_with_whisper(audio, languages, whisper_state, vocabulary).await
+    };
 
     // Post-processing: apply vocabulary replacements
     match transcription {
@@ -290,7 +300,10 @@ pub async fn run_stt(
 ) -> Result<TranscriptionResult> {
     let audio = segment.samples.clone();
     let sample_rate = segment.sample_rate;
-    match session.transcribe(&audio, sample_rate, &device.to_string()).await {
+    match session
+        .transcribe(&audio, sample_rate, &device.to_string())
+        .await
+    {
         Ok(transcription) => Ok(TranscriptionResult {
             input: AudioInput {
                 data: Arc::new(audio),
