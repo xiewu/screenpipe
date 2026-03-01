@@ -8223,7 +8223,7 @@ dependencies = [
 
 [[package]]
 name = "screenpipe-app"
-version = "2.1.2"
+version = "2.1.7"
 dependencies = [
  "anyhow",
  "arboard",
@@ -12276,7 +12276,6 @@ name = "whisper-rs"
 version = "0.15.1"
 source = "git+https://codeberg.org/tazz4843/whisper-rs.git?rev=d38738df8dc54b12d2918494586ba0817c3cb12f#d38738df8dc54b12d2918494586ba0817c3cb12f"
 dependencies = [
- "libc",
  "tracing",
  "whisper-rs-sys",
 ]
