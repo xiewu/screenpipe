@@ -149,6 +149,8 @@ export interface Env {
 	// Auto-reload settings
 	WEBSITE_URL: string;
 	AUTO_RELOAD_SECRET: string;
+	// Admin API auth
+	ADMIN_SECRET: string;
 }
 
 // User tier for rate limiting and model access
