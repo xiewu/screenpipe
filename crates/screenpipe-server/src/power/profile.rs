@@ -24,7 +24,7 @@ pub enum PowerMode {
 
 impl Default for PowerMode {
     fn default() -> Self {
-        Self::Auto
+        Self::Performance
     }
 }
 
