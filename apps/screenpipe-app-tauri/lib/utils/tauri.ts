@@ -293,6 +293,22 @@ async hideShortcutReminder() : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+async showNotificationPanel(payload: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("show_notification_panel", { payload }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async hideNotificationPanel() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("hide_notification_panel") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 /**
  * Register window-specific shortcuts (Escape, search shortcut) when main window is visible
  * These should only be active when the overlay is open to avoid blocking other apps
@@ -578,8 +594,8 @@ async piNewSession(sessionId: string | null) : Promise<Result<null, string>> {
 }
 },
 /**
- * Update Pi config files (models.json / auth.json) without restarting the process.
- * Call this when the user changes preset — Pi picks up the new config on next prompt.
+ * Update Pi config and restart the chat session so the new model takes effect.
+ * Without restart, Pi keeps using the provider/model from its original CLI args.
  */
 async piUpdateConfig(userToken: string | null, providerConfig: PiProviderConfig | null) : Promise<Result<null, string>> {
     try {

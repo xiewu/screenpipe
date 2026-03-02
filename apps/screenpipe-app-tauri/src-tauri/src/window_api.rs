@@ -1090,13 +1090,9 @@ impl ShowRewindWindow {
                                     // Same level as overlay — above fullscreen
                                     panel.set_level(1001);
                                     panel.released_when_closed(true);
-                                    // NonActivatingPanel so panel works on fullscreen Spaces
-                                    // without activating the app (which causes Space switching).
-                                    // Preserve existing style bits (titled, closable, resizable).
-                                    unsafe {
-                                        let current: i32 = msg_send![&*panel, styleMask];
-                                        panel.set_style_mask(current | 128);
-                                    }
+                                    // Do NOT set NSNonactivatingPanelMask (128) for window mode.
+                                    // That mask prevents the app from activating, which breaks
+                                    // keyboard input in WKWebView entirely.
                                     // Don't hide when app deactivates
                                     panel.set_hides_on_deactivate(false);
                                     // Enable dragging by title bar (normal window behavior)

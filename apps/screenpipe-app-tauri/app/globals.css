@@ -232,9 +232,6 @@
     /* cursor: default; */
   }
 
-  /* Explicit overrides for form inputs — the :not() exclusion above is not
-     sufficient in WebKit when parent elements have user-select:none, which
-     can propagate and block keyboard input in WKWebView edge cases. */
   input,
   textarea,
   [contenteditable],
