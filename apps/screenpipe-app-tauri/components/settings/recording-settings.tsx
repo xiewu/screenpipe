@@ -87,6 +87,7 @@ import { useSqlAutocomplete } from "@/lib/hooks/use-sql-autocomplete";
 import * as Sentry from "@sentry/react";
 import { defaultOptions } from "tauri-plugin-sentry-api";
 import { useLoginDialog } from "../login-dialog";
+import { BatterySaverSection } from "./battery-saver-section";
 import { ValidatedInput } from "../ui/validated-input";
 import {
   validateField,
@@ -1204,6 +1205,12 @@ Your screen is a pipe. Everything you see, hear, and type flows through it. Scre
         </p>
       </div>
 
+      {/* Battery Saver / Power Mode */}
+      <Card className="border-border bg-card">
+        <CardContent className="px-3 py-3">
+          <BatterySaverSection />
+        </CardContent>
+      </Card>
 
       {/* Data Directory */}
       <div className="space-y-2">

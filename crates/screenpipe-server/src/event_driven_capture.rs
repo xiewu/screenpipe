@@ -10,6 +10,7 @@
 
 use crate::hot_frame_cache::{HotFrame, HotFrameCache};
 use crate::paired_capture::{paired_capture, CaptureContext, PairedCaptureResult};
+use crate::power::PowerProfile;
 use anyhow::Result;
 use chrono::Utc;
 use screenpipe_accessibility::tree::TreeWalkerConfig;
@@ -22,7 +23,7 @@ use screenpipe_vision::utils::capture_monitor_image;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, watch};
 use tracing::{debug, error, info, warn};
 
 /// Types of events that trigger a capture.
@@ -213,17 +214,19 @@ pub async fn event_driven_capture_loop(
     vision_metrics: Arc<screenpipe_vision::PipelineMetrics>,
     hot_frame_cache: Option<Arc<HotFrameCache>>,
     use_pii_removal: bool,
+    power_profile_rx: Option<watch::Receiver<PowerProfile>>,
 ) -> Result<()> {
     info!(
         "event-driven capture started for monitor {} (device: {})",
         monitor_id, device_name
     );
 
-    let visual_check_enabled = config.visual_check_interval_ms > 0;
-    let visual_check_interval = Duration::from_millis(config.visual_check_interval_ms);
-    let visual_change_threshold = config.visual_change_threshold;
+    let mut visual_check_enabled = config.visual_check_interval_ms > 0;
+    let mut visual_check_interval = Duration::from_millis(config.visual_check_interval_ms);
+    let mut visual_change_threshold = config.visual_change_threshold;
 
     let mut state = EventDrivenCapture::new(config);
+    let mut power_profile_rx = power_profile_rx;
     let poll_interval = Duration::from_millis(50);
 
     // Frame comparer for visual change detection
@@ -302,6 +305,24 @@ pub async fn event_driven_capture_loop(
         if crate::sleep_monitor::screen_is_locked() {
             tokio::time::sleep(poll_interval).await;
             continue;
+        }
+
+        // Apply power profile changes (non-blocking check)
+        if let Some(ref mut rx) = power_profile_rx {
+            if rx.has_changed().unwrap_or(false) {
+                let profile = rx.borrow_and_update().clone();
+                debug!(
+                    "applying power profile {:?} to monitor {}",
+                    profile.name, monitor_id
+                );
+                state.config.min_capture_interval_ms = profile.min_capture_interval_ms;
+                state.config.idle_capture_interval_ms = profile.idle_capture_interval_ms;
+                state.config.jpeg_quality = profile.jpeg_quality;
+                visual_check_interval =
+                    Duration::from_millis(profile.visual_check_interval_ms);
+                visual_change_threshold = profile.visual_change_threshold;
+                visual_check_enabled = profile.visual_check_interval_ms > 0;
+            }
         }
 
         // Check for external triggers (non-blocking)

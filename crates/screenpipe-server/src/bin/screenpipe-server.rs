@@ -31,7 +31,7 @@ use screenpipe_server::{
     cli_pipe::handle_pipe_command,
     cli_status::handle_status_command,
     hot_frame_cache::HotFrameCache,
-    start_meeting_persister, start_meeting_watcher, start_sleep_monitor,
+    start_meeting_persister, start_meeting_watcher, start_power_manager, start_sleep_monitor,
     start_speaker_identification, start_ui_recording,
     sync_provider::ScreenpipeSyncProvider,
     vision_manager::{start_monitor_watcher, stop_monitor_watcher, VisionManager},
@@ -701,13 +701,17 @@ async fn main() -> anyhow::Result<()> {
     // Create shared pipeline metrics (used by recording + health endpoint + PostHog)
     let vision_metrics = Arc::new(screenpipe_vision::PipelineMetrics::new());
 
+    // Start power manager — polls battery/thermal state and broadcasts profile changes
+    let power_manager = start_power_manager();
+
     // Create VisionManager for event-driven capture on all monitors
     let (handle, capture_trigger_tx) = if !config.disable_vision {
         let vision_config =
             config.to_vision_manager_config(output_path_clone.to_string(), vision_metrics.clone());
         let vision_manager = Arc::new(
             VisionManager::new(vision_config, db_clone.clone(), vision_handle.clone())
-                .with_hot_frame_cache(hot_frame_cache.clone()),
+                .with_hot_frame_cache(hot_frame_cache.clone())
+                .with_power_profile(power_manager.subscribe()),
         );
 
         // Get the broadcast trigger sender BEFORE moving the VisionManager into
@@ -764,6 +768,7 @@ async fn main() -> anyhow::Result<()> {
     server.vision_metrics = vision_metrics;
     server.audio_metrics = audio_manager.metrics.clone();
     server.hot_frame_cache = Some(hot_frame_cache);
+    server.power_manager = Some(power_manager);
 
     // Attach sync handle if sync is enabled
     let server = if let Some(ref handle) = sync_service_handle {

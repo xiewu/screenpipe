@@ -17,7 +17,7 @@ use screenpipe_db::DatabaseManager;
 use screenpipe_server::{
     analytics, RecordingConfig,
     ResourceMonitor, SCServer, start_meeting_watcher,
-    start_sleep_monitor, start_ui_recording,
+    start_sleep_monitor, start_power_manager, start_ui_recording,
     hot_frame_cache::HotFrameCache,
     vision_manager::{VisionManager, start_monitor_watcher, stop_monitor_watcher},
 };
@@ -241,6 +241,9 @@ pub async fn start_embedded_server(
     // Create shared pipeline metrics (used by recording + health endpoint + PostHog)
     let vision_metrics = Arc::new(screenpipe_vision::PipelineMetrics::new());
 
+    // Start power manager — polls battery/thermal state and broadcasts profile changes
+    let power_manager = start_power_manager();
+
     // Capture trigger sender — set by VisionManager when vision is enabled.
     // Passed to start_ui_recording so UI events (clicks, app switches) trigger captures.
     let mut capture_trigger_tx: Option<screenpipe_server::event_driven_capture::TriggerSender> = None;
@@ -259,7 +262,9 @@ pub async fn start_embedded_server(
             vision_config,
             db_clone,
             vision_handle.clone(),
-        ).with_hot_frame_cache(hot_frame_cache.clone()));
+        )
+        .with_hot_frame_cache(hot_frame_cache.clone())
+        .with_power_profile(power_manager.subscribe()));
 
         // Get the broadcast trigger sender BEFORE moving VisionManager into the
         // spawned task. Passed to start_ui_recording so UI events trigger captures.
@@ -374,6 +379,7 @@ pub async fn start_embedded_server(
     server.vision_metrics = vision_metrics;
     server.audio_metrics = audio_manager.metrics.clone();
     server.hot_frame_cache = Some(hot_frame_cache);
+    server.power_manager = Some(power_manager);
 
     // Initialize pipe manager
     let pipes_dir = config.data_dir.join("pipes");

@@ -12,12 +12,13 @@ use screenpipe_vision::PipelineMetrics;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use tokio::runtime::Handle;
-use tokio::sync::RwLock;
+use tokio::sync::{watch, RwLock};
 use tokio::task::JoinHandle;
 use tracing::{debug, error, info, warn};
 
 use crate::event_driven_capture::{CaptureTrigger, TriggerSender};
 use crate::hot_frame_cache::HotFrameCache;
+use crate::power::PowerProfile;
 
 /// Configuration for VisionManager
 #[derive(Clone)]
@@ -50,6 +51,8 @@ pub struct VisionManager {
     trigger_tx: TriggerSender,
     /// Hot frame cache — capture pushes frames here for zero-DB timeline reads.
     hot_frame_cache: Option<Arc<HotFrameCache>>,
+    /// Power profile receiver — each monitor gets a clone.
+    power_profile_rx: Option<watch::Receiver<PowerProfile>>,
 }
 
 impl VisionManager {
@@ -69,12 +72,19 @@ impl VisionManager {
             recording_tasks: Arc::new(DashMap::new()),
             trigger_tx,
             hot_frame_cache: None,
+            power_profile_rx: None,
         }
     }
 
     /// Set the hot frame cache so captures push frames into it.
     pub fn with_hot_frame_cache(mut self, cache: Arc<HotFrameCache>) -> Self {
         self.hot_frame_cache = Some(cache);
+        self
+    }
+
+    /// Set the power profile receiver so capture loops adapt to battery state.
+    pub fn with_power_profile(mut self, rx: watch::Receiver<PowerProfile>) -> Self {
+        self.power_profile_rx = Some(rx);
         self
     }
 
@@ -220,6 +230,7 @@ impl VisionManager {
         let vision_metrics = self.config.vision_metrics.clone();
         let hot_frame_cache = self.hot_frame_cache.clone();
         let use_pii_removal = self.config.use_pii_removal;
+        let power_profile_rx = self.power_profile_rx.as_ref().map(|rx| rx.clone());
 
         info!(
             "Starting event-driven capture for monitor {} (device: {})",
@@ -243,6 +254,7 @@ impl VisionManager {
                 vision_metrics,
                 hot_frame_cache,
                 use_pii_removal,
+                power_profile_rx,
             )
             .await
             {

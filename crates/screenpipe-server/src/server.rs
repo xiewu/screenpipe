@@ -135,6 +135,8 @@ pub struct SCServer {
     pub audio_metrics: Arc<screenpipe_audio::metrics::AudioPipelineMetrics>,
     /// Shared hot frame cache — set this before starting the server so AppState uses it.
     pub hot_frame_cache: Option<Arc<HotFrameCache>>,
+    /// Power manager handle — set this before starting to enable /power endpoints.
+    pub power_manager: Option<Arc<crate::power::PowerManagerHandle>>,
 }
 
 impl SCServer {
@@ -164,6 +166,7 @@ impl SCServer {
             vision_metrics: Arc::new(screenpipe_vision::PipelineMetrics::new()),
             audio_metrics,
             hot_frame_cache: None,
+            power_manager: None,
         }
     }
 
@@ -518,6 +521,20 @@ impl SCServer {
                 )
                 .with_state(pm.clone());
             router.nest("/pipes", pipe_routes)
+        } else {
+            router
+        };
+
+        // Power management routes (if power manager is available)
+        let router = if let Some(ref pm) = self.power_manager {
+            let power_routes = Router::new()
+                .route(
+                    "/",
+                    get(crate::routes::power::get_power_status)
+                        .post(crate::routes::power::set_power_mode),
+                )
+                .with_state(pm.clone());
+            router.nest("/power", power_routes)
         } else {
             router
         };
